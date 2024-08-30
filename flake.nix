@@ -3,29 +3,33 @@
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
-    cargo2nix = {
-      url = "github:cargo2nix/cargo2nix/release-0.11.0";
-      inputs.nixpkgs.follows = "nixpkgs";
+
+    naersk.url = "github:nix-community/naersk";
+    nixpkgs-mozilla = {
+      url = "github:mozilla/nixpkgs-mozilla";
+      flake = false;
     };
   };
 
-  outputs = { self, nixpkgs, cargo2nix, ... }: {
+  outputs = { self, nixpkgs, naersk, nixpkgs-mozilla, ... }: {
     packages.x86_64-linux =
       let
         pkgs = import nixpkgs {
           system = "x86_64-linux";
-          overlays = [ cargo2nix.overlays.default ];
+          overlays = [ (import nixpkgs-mozilla) ];
         };
 
-        toolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+        toolchain = (pkgs.rustChannelOf {
+          rustToolchain = ./rust-toolchain.toml;
+          sha256 = "sha256-3jVIIf5XPnUU1CRaTyAiO0XHVbJl12MSx3eucTXCjtE=";
+        }).rust;
 
-        rustPkgs = pkgs.rustBuilder.makePackageSet {
-          rustVersion = toolchain;
-          packageFun = import ./Cargo.nix;
-        };
+        naersk' = pkgs.callPackage naersk { cargo = toolchain; rustc = toolchain; };
       in
       {
-        rust-nix-cozze = (rustPkgs.workspace.rust-nix-cozze { });
+        rust-nix-cozze = naersk'.buildPackage {
+          src = ./.;
+        };
       };
   };
 }
