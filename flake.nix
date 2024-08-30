@@ -4,27 +4,32 @@
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
 
-    naersk.url = "github:nix-community/naersk";
-    nixpkgs-mozilla = {
-      url = "github:mozilla/nixpkgs-mozilla";
-      flake = false;
+    naersk = {
+      url = "github:nix-community/naersk";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    fenix = {
+      url = "github:nix-community/fenix";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
-  outputs = { self, nixpkgs, naersk, nixpkgs-mozilla, ... }: {
+  outputs = { self, nixpkgs, naersk, fenix, ... }: {
     packages.x86_64-linux =
       let
         pkgs = import nixpkgs {
           system = "x86_64-linux";
-          overlays = [ (import nixpkgs-mozilla) ];
+          overlays = [ fenix.overlays.default ];
         };
 
-        toolchain = (pkgs.rustChannelOf {
-          rustToolchain = ./rust-toolchain.toml;
-          sha256 = "sha256-3jVIIf5XPnUU1CRaTyAiO0XHVbJl12MSx3eucTXCjtE=";
-        }).rust;
+        toolchain = pkgs.fenix.stable;
 
-        naersk' = pkgs.callPackage naersk { cargo = toolchain; rustc = toolchain; };
+        naersk' = pkgs.callPackage
+          naersk
+          {
+            cargo = toolchain.cargo;
+            rustc = toolchain.rustc;
+          };
       in
       {
         rust-nix-cozze = naersk'.buildPackage {
