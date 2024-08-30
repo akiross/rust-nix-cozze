@@ -3,7 +3,6 @@
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
-
     naersk = {
       url = "github:nix-community/naersk";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -22,18 +21,24 @@
           overlays = [ fenix.overlays.default ];
         };
 
-        toolchain = pkgs.fenix.stable;
+        toolchain = with fenix.packages.x86_64-linux; combine [
+          minimal.cargo
+          minimal.rustc
+          targets.x86_64-unknown-linux-musl.latest.rust-std
+        ];
 
         naersk' = pkgs.callPackage
           naersk
           {
-            cargo = toolchain.cargo;
-            rustc = toolchain.rustc;
+            cargo = toolchain;
+            rustc = toolchain;
           };
       in
       {
         rust-nix-cozze = naersk'.buildPackage {
           src = ./.;
+          # This is necessary or it wil build for glibc
+          CARGO_BUILD_TARGET = "x86_64-unknown-linux-musl";
         };
       };
   };
